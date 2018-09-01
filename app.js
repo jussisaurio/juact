@@ -21,12 +21,13 @@ class App extends Juact.Component {
   }
 
   render() {
-    return (
+    return window.tree = (
       <div>
         <Header title="Super Juact App" />
         <ul id="main-list">
           { this.state.items.map(item => <li id={`list-item-${item.id}`} >{ item.id }</li>) }
         </ul>
+        { Math.random() > 0.5 && <Header title="Footer" /> }
       </div>
     );
   }
@@ -50,7 +51,7 @@ class Header extends Juact.Component {
 
   render() {
     return (
-      <h1 class="header">{ this.props.title + "!".repeat(this.state.exclamationMarks) }</h1>
+      <h1 onClick={() => alert("wubbrks")} class="header">{ this.props.title + "!".repeat(this.state.exclamationMarks) }</h1>
     );
   }
 }

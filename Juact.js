@@ -1,10 +1,9 @@
+import { create } from "domain";
+
 // Bookkeeping variables
 let _rootEl;
-let _appEl;
+window._appEl = null;
 window._vdom = null;
-let _instances = new WeakMap();
-let _instanceGuidMap = {};
-let _guid = 0;
 let _renderQueue = new Map();
 
 // Base component class
@@ -16,8 +15,8 @@ class Component {
 
   componentDidMount() {}
   componentDidUpdate(oldState) {
-    console.log("Component did update", this);
-    if (oldState) console.log(oldState);
+    //console.log("Component did update", this);
+    // if (oldState) console.log(oldState);
   }
   componentWillUnmount() {}
 
@@ -25,8 +24,40 @@ class Component {
     _renderQueue.set(this, newState);
   }
 
-  render() {
-    throw new Error("Component must implement render method");
+  static render(node, parent) {
+    if (isJuactComponent(node.type)) {
+      const instance = new node.type(node.props);
+      (window.instances || (window.instances = [])).push(instance);
+      instance._el = createElement(instance.render(), parent);
+      instance._el._instance = instance;
+      instance.componentDidMount();
+      return instance._el;
+    }
+
+    return createElement(node.type(node.props), parent);
+  }
+
+  static patch(el, node, parent = el.parentNode) {
+    if (el._instance) {
+      el._instance.props = node ? node.props : el._instance.props;
+      return patch(el, el._instance.render(), parent);
+    }
+
+    if (isJuactComponent(node.type)) {
+      const newEl = Component.render(node, parent);
+      if (parent) {
+        parent.replaceChild(newEl, el);
+        return newEl;
+      }
+
+      return newEl;
+    }
+
+    return patch(el, node.type(props), parent);
+  }
+
+  static dispatchEvent(e) {
+    e.currentTarget.events[event.type](e);
   }
 }
 
@@ -39,143 +70,121 @@ const Juact = {
 export default Juact;
 
 // Helpers
-const isJuactComponent = ctor => Object.getPrototypeOf(ctor.prototype) === Juact.Component.prototype;
+const isJuactComponent = ctor => ctor && ctor.prototype && Object.getPrototypeOf(ctor.prototype) === Juact.Component.prototype;
 const setProp = (element, name, value) => name === "children" ? null : element.setAttribute(name === "className" ? "class" : name, value);
 const removeProp = (element, name) => name === "children" ? null : element.removeAttribute(name === "className" ? "class" : name);
-const isDefined = val => val != null;
+const isValidNode = val => val != null && typeof val !== "boolean";
 const isTextNode = val => ["number", "string"].includes(typeof val);
 const hasProp = (obj, prop) => obj.props.hasOwnProperty(prop);
+const isSameHTMLType = (el, node) => el.nodeName === node.type.toUpperCase();
 
 // JSX => Juact.h function calls
 function h(type = "div", props, ...children) {
   props = props || {};
   props.children = [].concat.apply([], children); // flatten
   
-  // Component
-  if (typeof type === "function") {
-    if (isJuactComponent(type)) {
-      const instance = new type(props);
-      instance.vdom = instance.render();
-      const guid = ++_guid;
-      _instanceGuidMap[guid] = instance;
-      return Object.assign(instance.vdom, { _instance: guid });
-    }
-
-    return type(props);
-  }
-
-  // Element primitive, e.g. "div"
   return { type, props };
 }
 
 // Append element to parent and call componentDidMount on Juact.Component instances
-function mount(element, parent) {
-  parent.appendChild(element);
-  const instanceGuid = _instances.get(element);
-  if (instanceGuid != null) {
-    const instance = _instanceGuidMap[instanceGuid];
-    instance.componentDidMount();
-  }
+function mount(parent, element) {
+  if (isValidNode(element)) parent.appendChild(element);
+  return element;
 }
 
-function unmount(element, parent) {
-  const instanceGuid = _instances.get(element);
-  if (instanceGuid) {
-    const instance = _instanceGuidMap[instanceGuid];
-    instance.componentWillUnmount();
-  }  
-  parent.removeChild(element);
+function unmount(parent, element) {
+  if (isValidNode(element)) parent.removeChild(element);
+  return isValidNode(element);
 }
 
-function replace(element, oldElement, parent) {
-  const oldInstanceGuid = _instances.get(oldElement);
-  if (oldInstanceGuid) {
-    const oldInstance = _instanceGuidMap[oldInstanceGuid];
-    oldInstance.componentWillUnmount();
-  } 
-  parent.replaceChild(oldElement, element);
-  const instanceGuid = _instances.get(element);
-  if (instanceGuid) {
-    const instance = _instanceGuidMap[instanceGuid];
-    instance.componentDidMount();
-  }
+function replace(parent, element, oldElement) {
+  parent.replaceChild(element, oldElement);
+  return element;
 }
 
-// Convert VDom node into actual DOM node
-function createElement(node) {
+function createElement(node, parent) {
   if ([undefined, null, false, true].includes(node)) return null;
-  if (["number", "string"].includes(typeof node)) return document.createTextNode(node);
+  if (isTextNode(node)) {
+    return mount(parent, document.createTextNode(node));
+  }
 
+  if (typeof node.type === "function") {
+    return Component.render(node, parent);
+  }
+
+  // Primitive e.g. 'div'
   const el = document.createElement(node.type);
-  if (node._instance) {
-    _instances.set(el, node._instance);
-    _instanceGuidMap[node._instance]._el = el;
-  }
-  Object.keys(node.props).forEach(key => setProp(el, key, node.props[key]));
-  node.props.children.forEach(c => {
-    const childEl = createElement(c);
-    if (childEl) {
-      mount(childEl, el);
-    }
-  })
+  updateElement(el, node);
+  node.props.children.forEach(c => createElement(c, el));
 
-
-  return el;
+  return mount(parent, el) && el;
 }
 
-function updateElement(parent, element, oldNode, newNode) {
-  const props = Object.assign({}, oldNode.props, newNode.props);
+function updateElement(element, newNode) {
+  const oldProps = element.getAttributeNames().reduce(
+    (acc, a) => Object.assign(acc, { [a]: element.getAttribute(a) }), {}
+  );
+  const props = Object.assign({}, oldProps, newNode.props);
   const keys = Object.keys(props).filter(p => p !== "children");
-  let updated = false;
+
   for (const prop of keys) {
-    if (hasProp(oldNode, prop) && !hasProp(newNode, prop)) {
-      removeProp(element, prop, props[prop]);
-      updated = true;
+    if (prop.startsWith("on")) {
+      const event = prop.slice(2).toLowerCase();
+      if (!element.events) {
+        element.events = {};
+      }
+      if (typeof newNode.props[prop] === "function") {
+        if (!element.events[event]) element.addEventListener(event, Component.dispatchEvent);
+        element.events[event] = newNode.props[prop];
+      } else {
+        element.removeEventListener(event, Component.dispatchEvent);
+      }
     }
+    else {
+      if (oldProps.hasOwnProperty(prop) && !hasProp(newNode, prop)) {
+        removeProp(element, prop, props[prop]);
+      }
 
-    else if (oldNode.props[prop] != newNode.props[prop]) {
-      setProp(element, prop, props[prop]);
-      updated = true;
+      else if (oldProps[prop] != newNode.props[prop]) {
+        setProp(element, prop, props[prop]);
+      }
     }
-  }
-
-  if (updated && newNode._instance) {
-    newNode._instance.componentDidUpdate();
   }
 }
 
-function patch(parent, element, oldNode, newNode) {
-  if (oldNode === newNode) return;
-
-  if (isDefined(oldNode) && !isDefined(newNode)) {
-    unmount(element, parent);
+function patch(el, node, parent = el.parentNode) {
+  if (!isValidNode(node)) return unmount(parent, el);
+  if (!isValidNode(el)) {
+    if (isValidNode(parent)) return mount(parent, createElement(node, parent));
+    else return;
   }
 
-  else if (!isDefined(oldNode) && isDefined(newNode)) {
-    const newEl = createElement(newNode);
-    mount(newEl, parent);
+  if (typeof node.type === "function") {
+    return Component.patch(el, node, parent);
   }
-
-  else if (isTextNode(newNode) && newNode != oldNode) {
-    element.nodeValue = newNode;
-  }
-
-  else if (newNode.type !== oldNode.type) {
-    const newEl = createElement(newNode);
-    replace(newEl, element, parent);
-  }
-
-  else {
-    updateElement(parent, element, oldNode, newNode);
-
-    const oldChildren = oldNode.props.children;
-    const newChildren = newNode.props.children;
-    const childNodes = [].slice.call(element.childNodes);
-    const numChildren = Math.max(oldChildren.length, newChildren.length);
-    for (let i = 0; i < numChildren; i++) {
-      patch(element, childNodes[i], oldChildren[i], newChildren[i]);
+  if (isTextNode(node)) {
+    if (el.textContent !== node) {
+      const newEl = createElement(node, parent);
+      parent.replaceChild(newEl, el);
+      return newEl;
     }
+    return el;
   }
+  if (!node.type) console.log(node);
+  if (!isSameHTMLType(el, node)) {
+    const newEl = createElement(node, parent);
+    parent.replaceChild(newEl, el);
+    return newEl;    
+  }
+
+  updateElement(el, node);
+
+  const newChildren = node.props.children;
+  const childNodes = [].slice.call(el.childNodes);
+  const numChildren = Math.max(childNodes.length, newChildren.length);
+  for (let i = 0; i < numChildren; i++) {
+    patch(childNodes[i], newChildren[i], el);
+  }  
 }
 
 let skipRender = false;
@@ -195,10 +204,7 @@ function _enqueueRender() {
   _renderQueue = new Map();
 
   updates.forEach(component => {
-    const newVdom = component.render();
-    patch(component._el.parentNode, component._el, component.vdom, newVdom);
-    component.vdom = newVdom;
-    component.componentDidUpdate();
+    Component.patch(component._el);
   })
 
   skipRender = false;
@@ -207,8 +213,6 @@ function _enqueueRender() {
 // Main render function for attaching Juact apps to the DOM
 function render(rootEl, rootComponent) {
   _rootEl = rootEl;
-  _appEl = createElement(rootComponent);
-  _vdom = rootComponent;
-  mount(_appEl, _rootEl);
-  setInterval(_enqueueRender, 0);
+  _appEl = createElement(rootComponent, _rootEl);
+  setInterval(() => _renderQueue.size && _enqueueRender(), 0);
 }
