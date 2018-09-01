@@ -128,6 +128,7 @@ function updateElement(element, newNode) {
   const keys = Object.keys(props).filter(p => p !== "children");
 
   for (const prop of keys) {
+    // Event listeners
     if (prop.startsWith("on")) {
       const event = prop.slice(2).toLowerCase();
       if (!element.events) {
@@ -140,6 +141,14 @@ function updateElement(element, newNode) {
         element.removeEventListener(event, Component.dispatchEvent);
       }
     }
+    // Style objects
+    if (prop === "style") {
+      const style = newNode.props[prop];
+      for (const [key, value] of Object.entries(style)) {
+        element.style[key] = value;
+      }
+    }
+    // Other properties
     else {
       if (oldProps.hasOwnProperty(prop) && !hasProp(newNode, prop)) {
         removeProp(element, prop, props[prop]);

@@ -33,6 +33,8 @@ class App extends Juact.Component {
   }
 }
 
+const headerStyle = { color: "tomato", "font-family": "Verdana" };
+
 class Header extends Juact.Component {
   constructor(props) {
     super(props);
@@ -51,7 +53,13 @@ class Header extends Juact.Component {
 
   render() {
     return (
-      <h1 onClick={() => alert("wubbrks")} class="header">{ this.props.title + "!".repeat(this.state.exclamationMarks) }</h1>
+      <h1
+        onClick={() => alert("wubbrks")}
+        class="header"
+        style={headerStyle}
+      >
+        { this.props.title + "!".repeat(this.state.exclamationMarks) }
+      </h1>
     );
   }
 }
