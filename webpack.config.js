@@ -1,5 +1,5 @@
 module.exports = {
-  entry: "./app.js",
+  entry: "./someRandomDudesTodoApp.js",
   module: {
     rules: [
       {

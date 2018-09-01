@@ -13,12 +13,15 @@ class Component {
     this.state = {};
   }
 
-  componentDidMount() {}
-  componentDidUpdate(oldState) {
-    //console.log("Component did update", this);
-    // if (oldState) console.log(oldState);
+  componentDidMount() {
+    console.log("mounting", this);
   }
-  componentWillUnmount() {}
+  componentDidUpdate(oldState) {
+    console.log("updated", this);
+  }
+  componentWillUnmount() {
+    console.log("unmounting", this);
+  }
 
   setState(newState) {
     _renderQueue.set(this, newState);
@@ -53,7 +56,7 @@ class Component {
       return newEl;
     }
 
-    return patch(el, node.type(props), parent);
+    return patch(el, node.type(node.props), parent);
   }
 
   static dispatchEvent(e) {
@@ -93,7 +96,10 @@ function mount(parent, element) {
 }
 
 function unmount(parent, element) {
-  if (isValidNode(element)) parent.removeChild(element);
+  if (isValidNode(element)) {
+    element._instance && element._instance.componentWillUnmount();
+    parent.removeChild(element);
+  }
   return isValidNode(element);
 }
 
@@ -142,7 +148,7 @@ function updateElement(element, newNode) {
       }
     }
     // Style objects
-    if (prop === "style") {
+    else if (prop === "style") {
       const style = newNode.props[prop];
       for (const [key, value] of Object.entries(style)) {
         element.style[key] = value;
