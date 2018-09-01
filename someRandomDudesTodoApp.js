@@ -1,7 +1,7 @@
-// Taken and modified from some random guy's sample app: https://codepen.io/codebeast/pen/PzVyRm?editors=1010
+// Taken and modified from some random guy"s sample app: https://codepen.io/codebeast/pen/PzVyRm?editors=1010
 // Testing Juact as a drop-in replacement for React
-import Juact from './Juact';
-import todos from './todos.json';
+import Juact from "./Juact";
+import todos from "./todos.json";
 
 const Title = ({todoCount}) => {
   return (
@@ -23,9 +23,7 @@ const TodoForm = ({addTodo}) => {
   // Return JSX
   return (
     <form onSubmit={handleAdd}>
-      <input className="form-control col-md-12" ref={node => {
-        input = node;
-      }} />
+      <input className="form-control col-md-12" />
       <br />
     </form>
   );
@@ -46,7 +44,7 @@ const Todo = ({todo, remove}) => {
 const TodoList = ({todos, remove}) => {
   // Map through the todos
   const todoNode = todos.map((todo) => <Todo todo={todo} key={todo.id} remove={remove}/>);
-  return <div className="list-group" style={{marginTop:'30px'}}>{todoNode}</div>;
+  return <div className="list-group" style={{marginTop:"30px"}}>{todoNode}</div>;
 }
 
 // Container Component
