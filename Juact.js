@@ -1,7 +1,12 @@
-import { patchComponent } from "./lib/renderer";
 import Component from "./lib/Component";
 import JSXToJS from "./lib/JSXtoJS";
-import { createElement } from "./lib/vdom";
+import dom from "./lib/dom";
+import {
+  createElement,
+  renderComponent,
+  patchComponent,
+  jsxMap
+} from "./lib/vdom";
 
 // Bookkeeping variables
 let _rootEl;
@@ -16,16 +21,24 @@ function _enqueueRender() {
   const queue = Component._renderQueue.entries();
   let current;
   while (!(current = queue.next()).done) {
-    const [ component, newState ] = current.value;
+    const [component, newState] = current.value;
     const oldState = component.state;
     const mergedState = Object.assign({}, oldState, newState);
-    component.state = mergedState;
-    updates.push(component);
+    updates.push([component, mergedState, oldState]);
   }
   Component._renderQueue = new Map();
 
-  updates.forEach(component => {
-    patchComponent(component._el);
+  updates.forEach(([component, newState, oldState]) => {
+    if (component.shouldComponentUpdate(component.props, newState)) {
+      component.state = newState;
+      patchComponent(
+        component._el,
+        component.render(),
+        jsxMap.get(component),
+        component._el.parentNode,
+        oldState
+      );
+    }
   });
 
   skipRender = false;
@@ -34,7 +47,9 @@ function _enqueueRender() {
 // Main render function for attaching Juact apps to the DOM
 function render(rootEl, rootComponent) {
   _rootEl = rootEl;
-  _appEl = createElement(rootComponent, _rootEl);
+  _vdom = renderComponent(rootComponent);
+  _appEl = createElement(_vdom, _rootEl);
+  dom.mount(_rootEl, _appEl);
   setInterval(() => Component._renderQueue.size && _enqueueRender(), 0);
 }
 
@@ -42,7 +57,7 @@ function render(rootEl, rootComponent) {
 const Juact = {
   Component,
   h: JSXToJS,
-  render,
-}
+  render
+};
 
 export default Juact;

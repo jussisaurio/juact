@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "webpack --mode development",
-    "baabel": "babel app.js --out-file bapp.js"
+    "baabel": "babel app.js --out-file bapp.js",
+    "prettier": "prettier *.js lib/*.js --write"
   },
   "author": "",
   "license": "ISC",
@@ -14,6 +15,7 @@
     "babel-cli": "^6.26.0",
     "babel-loader": "^7.1.5",
     "babel-plugin-transform-react-jsx": "^6.24.1",
+    "prettier": "^1.14.2",
     "webpack": "^4.17.1",
     "webpack-cli": "^3.1.0"
   },
