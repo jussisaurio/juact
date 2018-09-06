@@ -1,24 +1,26 @@
 import Component from "./lib/Component";
-import JSXToJS from "./lib/JSXtoJS";
-import dom from "./lib/dom";
+import DOM from "./lib/dom";
 import {
   createElement,
   renderComponent,
   patchComponent,
   jsxMap
 } from "./lib/vdom";
+import { isValidNode } from "./lib/helpers";
 
 // Bookkeeping variables
 let _rootEl;
-window._appEl = null;
-window._vdom = null;
+let _appEl;
+let _vdom;
 let skipRender = false;
 
 function _enqueueRender() {
   if (skipRender) return;
   skipRender = true;
-  const updates = [];
+
   const queue = Component._renderQueue.entries();
+
+  const updates = [];
   let current;
   while (!(current = queue.next()).done) {
     const [component, newState] = current.value;
@@ -33,7 +35,7 @@ function _enqueueRender() {
       component.state = newState;
       patchComponent(
         component._el,
-        component.render(),
+        null,
         jsxMap.get(component),
         component._el.parentNode,
         oldState
@@ -45,18 +47,30 @@ function _enqueueRender() {
 }
 
 // Main render function for attaching Juact apps to the DOM
-function render(rootEl, rootComponent) {
+function render(rootComponent, rootEl) {
   _rootEl = rootEl;
+  // Create VDOM tree
   _vdom = renderComponent(rootComponent);
-  _appEl = createElement(_vdom, _rootEl);
-  dom.mount(_rootEl, _appEl);
+  // Create DOM tree
+  _appEl = createElement(_vdom);
+  // Attach to document
+  DOM.mount(_rootEl, _appEl);
+
   setInterval(() => Component._renderQueue.size && _enqueueRender(), 0);
+}
+
+// JSX => Juact.h function calls
+function JsxToJs(type = "div", props, ...children) {
+  props = props || {};
+  props.children = [].concat.apply([], children).filter(isValidNode); // flatten, remove undef/null/true/false
+
+  return { type, props, key: props.key };
 }
 
 // Main public interface
 const Juact = {
   Component,
-  h: JSXToJS,
+  h: JsxToJs,
   render
 };
 

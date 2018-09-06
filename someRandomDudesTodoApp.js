@@ -38,22 +38,44 @@ const TodoForm = ({ addTodo }) => {
   );
 };
 
-const Todo = ({ todo, remove }) => {
-  return (
-    <div
-      className="list-group-item"
-      onClick={() => remove(todo.id)}
-      style={{ cursor: "pointer" }}
-    >
-      {todo.text}
-    </div>
-  );
-};
+class Todo extends Juact.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      taskAge: 0
+    };
+  }
+  componentDidMount() {
+    console.log("mount todo item", this);
+    this._interval = setInterval(
+      () => this.setState({ taskAge: this.state.taskAge + 2 }),
+      2000
+    );
+  }
+  componentWillUnmount() {
+    clearInterval(this._interval);
+    console.log("unmount todo item", this);
+  }
+  render() {
+    const { todo, remove, uppercase } = this.props;
+    const { taskAge } = this.state;
+    const text = `${todo.text} (${taskAge} seconds old task)`;
+    return (
+      <div
+        className="list-group-item"
+        onClick={() => remove(todo.id)}
+        style={{ cursor: "pointer" }}
+      >
+        {uppercase ? text.toUpperCase() : text}
+      </div>
+    );
+  }
+}
 
-const TodoList = ({ todos, remove }) => {
+const TodoList = ({ todos, remove, uppercase }) => {
   // Map through the todos
   const todoNode = todos.map(todo => (
-    <Todo todo={todo} key={todo.id} remove={remove} />
+    <Todo uppercase={uppercase} todo={todo} key={todo.id} remove={remove} />
   ));
   return (
     <div className="list-group" style={{ marginTop: "30px" }}>
@@ -69,12 +91,19 @@ class TodoApp extends Juact.Component {
     super(props);
     // Set initial state
     this.state = {
-      data: JSON.parse(JSON.stringify(todos))
+      data: JSON.parse(JSON.stringify(todos)).slice(0, 4),
+      uppercase: false
     };
+
+    this.shuffle = this.shuffle.bind(this);
   }
 
   componentDidMount() {
     console.log("Todo app mounted");
+    // setInterval(
+    //   () => this.setState({ uppercase: !this.state.uppercase }),
+    //   3000
+    // );
   }
   // Add todo handler
   addTodo(val) {
@@ -94,6 +123,11 @@ class TodoApp extends Juact.Component {
     this.setState({ data: remainder });
   }
 
+  shuffle() {
+    const data = this.state.data.slice().sort(() => Math.random() - 0.5);
+    this.setState({ data });
+  }
+
   render() {
     // Render JSX
     return (
@@ -101,11 +135,15 @@ class TodoApp extends Juact.Component {
         <Title todoCount={this.state.data.length} />
         <TodoForm addTodo={this.addTodo.bind(this)} />
         <TodoList
+          uppercase={this.state.uppercase}
           todos={this.state.data}
           remove={this.handleRemove.bind(this)}
         />
+        <div className="btn btn-primary" onClick={this.shuffle}>
+          Shuffle
+        </div>
       </div>
     );
   }
 }
-Juact.render(document.getElementById("main"), <TodoApp />);
+Juact.render(<TodoApp />, document.querySelector("#main"));
